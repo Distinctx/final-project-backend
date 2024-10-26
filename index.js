@@ -6,18 +6,16 @@ const Post = require('./models/Post');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
-const multer = require('multer');
-const fs = require('fs');
 const dotenv = require('dotenv');
 
 const app = express();
 
-// Load environment variables only in development
+// Load environment variables in development only
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
 }
 
-// Check if required environment variables are accessible
+// Check environment variables
 const salt = bcrypt.genSaltSync(10);
 const secret = process.env.JWT_SECRET;
 if (!process.env.MONGO_URI || !process.env.JWT_SECRET) {
@@ -30,18 +28,17 @@ app.use(cors({ credentials: true, origin: 'http://localhost:3000' }));
 app.use(express.json());
 app.use(cookieParser());
 
-// MongoDB connection with logging
+// MongoDB connection with error handling
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
   .then(() => console.log('Connected to MongoDB'))
-  .catch((error) => console.error('MongoDB connection error:', error));
-
-// Define file upload handler with conditional handling for Vercel
-const uploadMiddleware = multer({ dest: 'uploads/' });
+  .catch(error => console.error('MongoDB connection error:', error));
 
 // Routes
+
+// Registration route
 app.post('/register', async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -56,6 +53,7 @@ app.post('/register', async (req, res) => {
   }
 });
 
+// Login route
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -77,6 +75,7 @@ app.post('/login', async (req, res) => {
   }
 });
 
+// Profile route
 app.get('/profile', (req, res) => {
   const { token } = req.cookies;
   try {
@@ -88,31 +87,26 @@ app.get('/profile', (req, res) => {
   }
 });
 
+// Logout route
 app.post('/logout', (req, res) => {
   res.cookie('token', '').json('ok');
 });
 
-app.post('/post', uploadMiddleware.single('file'), async (req, res) => {
+// Post creation route (with placeholder for file URL)
+app.post('/post', async (req, res) => {
   try {
     const { token } = req.cookies;
     const info = jwt.verify(token, secret);
     const { title, summary, content } = req.body;
 
-    // Handle file upload only in development
-    let cover = null;
-    if (req.file && process.env.NODE_ENV !== 'production') {
-      const { originalname, path } = req.file;
-      const ext = originalname.split('.').pop();
-      const newPath = `${path}.${ext}`;
-      fs.renameSync(path, newPath);
-      cover = newPath;
-    }
+    // Placeholder URL for cover image in serverless environment
+    const cover = "https://placeholder.url"; // Replace with actual storage URL when available
 
     const postDoc = await Post.create({
       title,
       summary,
       content,
-      cover: cover || 'cloud-storage-url', // Replace with cloud storage if needed
+      cover,
       author: info.id,
     });
     res.json(postDoc);
@@ -122,19 +116,12 @@ app.post('/post', uploadMiddleware.single('file'), async (req, res) => {
   }
 });
 
-app.put('/post', uploadMiddleware.single('file'), async (req, res) => {
+// Update post route
+app.put('/post', async (req, res) => {
   try {
     const { token } = req.cookies;
     const info = jwt.verify(token, secret);
     const { id, title, summary, content } = req.body;
-
-    let newPath = null;
-    if (req.file && process.env.NODE_ENV !== 'production') {
-      const { originalname, path } = req.file;
-      const ext = originalname.split('.').pop();
-      newPath = `${path}.${ext}`;
-      fs.renameSync(path, newPath);
-    }
 
     const postDoc = await Post.findById(id);
     if (JSON.stringify(postDoc.author) !== JSON.stringify(info.id)) {
@@ -145,7 +132,7 @@ app.put('/post', uploadMiddleware.single('file'), async (req, res) => {
       title,
       summary,
       content,
-      cover: newPath || postDoc.cover,
+      cover: postDoc.cover, // Using existing cover in serverless environment
     });
     res.json(postDoc);
   } catch (err) {
@@ -154,6 +141,7 @@ app.put('/post', uploadMiddleware.single('file'), async (req, res) => {
   }
 });
 
+// Fetch all posts
 app.get('/post', async (req, res) => {
   try {
     const posts = await Post.find()
@@ -167,6 +155,7 @@ app.get('/post', async (req, res) => {
   }
 });
 
+// Fetch post by ID
 app.get('/post/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -178,9 +167,5 @@ app.get('/post/:id', async (req, res) => {
   }
 });
 
-// Start server
-app.listen(process.env.PORT || 4000, () => {
-  console.log(`Server running on port ${process.env.PORT || 4000}`);
-});
-
+// Export the app for serverless function
 module.exports = app;
