@@ -15,6 +15,12 @@ if (process.env.NODE_ENV !== 'production') {
   dotenv.config();
 }
 
+// Temporary console.log statements for debugging environment variables
+console.log("Environment variables:", {
+  MONGO_URI: process.env.MONGO_URI ? "MONGO_URI is set" : "MONGO_URI is missing",
+  JWT_SECRET: process.env.JWT_SECRET ? "JWT_SECRET is set" : "JWT_SECRET is missing"
+});
+
 // Check environment variables
 const salt = bcrypt.genSaltSync(10);
 const secret = process.env.JWT_SECRET;
